@@ -1,0 +1,26 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+```
+
+**Step 3: Make sure your folder structure looks like this:**
+```
+messaging_app/
+├── app.py
+├── database/
+│   └── db.py
+├── routes/
+│   └── auth.py
+├── templates/
+│   ├── signup.html
+│   ├── login.html
+│   └── dashboard.html (CREATE THIS)
+└── static/
+    └── css/
+        └── style.css (CREATE THIS)

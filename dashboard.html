@@ -1,0 +1,1228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Messaging App</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #f0f0f0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow: hidden; }
+        .navbar { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .container-main { display: flex; height: calc(100vh - 60px); gap: 0; }
+        .sidebar { width: 350px; background: white; border-right: 1px solid #e0e0e0; overflow-y: auto; padding: 0; }
+        .sidebar-header { padding: 20px; border-bottom: 1px solid #e0e0e0; background: white; position: sticky; top: 0; z-index: 10; }
+        .nav-tabs { border-bottom: 2px solid #f0f0f0; margin-bottom: 10px; }
+        .nav-tabs .nav-link { color: #666; border: none; padding: 10px 20px; }
+        .nav-tabs .nav-link.active { color: #667eea; border-bottom: 2px solid #667eea; font-weight: 600; }
+        .search-box input { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 20px; font-size: 14px; margin-bottom: 10px; }
+        .btn-action { width: 100%; padding: 10px; border-radius: 8px; font-size: 14px; cursor: pointer; border: none; margin-bottom: 5px; }
+        .btn-add-contact { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .btn-create-group { background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%); color: white; }
+        .contacts-list { padding: 0; }
+        .contact-item, .group-item { padding: 15px 20px; border-bottom: 1px solid #f0f0f0; cursor: pointer; transition: background 0.2s; display: flex; justify-content: space-between; align-items: center; }
+        .contact-item:hover, .contact-item.active, .group-item:hover, .group-item.active { background: #f9f9f9; }
+        .contact-item.active, .group-item.active { background: #e8e8ff; border-left: 4px solid #667eea; }
+        .contact-info { flex: 1; }
+        .contact-name { font-weight: 600; color: #333; margin-bottom: 5px; }
+        .contact-status { font-size: 12px; color: #999; }
+        .status-badge { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; }
+        .status-online { background: #31a24c; }
+        .status-offline { background: #ccc; }
+        .unread-badge { background: #667eea; color: white; border-radius: 12px; padding: 2px 8px; font-size: 11px; font-weight: 600; }
+        .group-badge { background: #2ecc71; color: white; border-radius: 12px; padding: 2px 8px; font-size: 11px; font-weight: 600; margin-left: 5px; }
+        .chat-container { flex: 1; display: flex; flex-direction: column; background: white; }
+        .chat-header { padding: 15px 20px; background: white; border-bottom: 2px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center; }
+        .chat-user-info h4 { margin: 0; color: #333; font-size: 18px; }
+        .chat-user-status { font-size: 13px; color: #999; }
+        .typing-indicator { font-size: 13px; color: #667eea; font-style: italic; }
+        .chat-messages { flex: 1; padding: 20px; overflow-y: auto; background: #f9f9f9; }
+        .message { margin-bottom: 15px; display: flex; position: relative; }
+        .message.mine { justify-content: flex-end; }
+        .message.mine:hover .message-actions { display: flex; }
+        .message-bubble { max-width: 60%; padding: 10px 15px; border-radius: 18px; word-wrap: break-word; position: relative; }
+        .message.mine .message-bubble { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-bottom-right-radius: 4px; }
+        .message.theirs .message-bubble { background: white; color: #333; border: 1px solid #e0e0e0; border-bottom-left-radius: 4px; }
+        .message-deleted { opacity: 0.5; font-style: italic; }
+        .message-deleted .message-actions { display: none !important; }
+        .message-actions { display: none; position: absolute; top: 50%; transform: translateY(-50%); left: -80px; gap: 5px; z-index: 10; }
+        .message-actions button { background: white; border: 1px solid #ddd; border-radius: 50%; width: 30px; height: 30px; cursor: pointer; font-size: 12px; color: #666; transition: all 0.2s; }
+        .message-actions button:hover { background: #f0f0f0; color: #333; }
+        .edited-label { font-size: 10px; opacity: 0.7; font-style: italic; margin-left: 5px; }
+        .sender-name { font-size: 12px; font-weight: 600; margin-bottom: 3px; color: #667eea; }
+        .message-time { font-size: 11px; opacity: 0.7; margin-top: 5px; }
+        .message-status { font-size: 11px; margin-top: 5px; }
+        .message.mine .message-status i { color: white; }
+        .chat-input-container { padding: 15px 20px; background: white; border-top: 2px solid #f0f0f0; display: flex; gap: 10px; }
+        .chat-input { flex: 1; padding: 12px 15px; border: 1px solid #ddd; border-radius: 25px; font-size: 14px; }
+        .chat-input:focus { outline: none; border-color: #667eea; }
+        .btn-send { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 12px 25px; border-radius: 25px; cursor: pointer; font-weight: 600; }
+        .btn-send:hover { opacity: 0.9; }
+        .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #999; text-align: center; }
+        .empty-state i { font-size: 80px; margin-bottom: 20px; opacity: 0.3; }
+        .modal-content { border-radius: 12px; border: none; box-shadow: 0 5px 30px rgba(0,0,0,0.2); }
+        .modal-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 12px 12px 0 0; }
+        .search-results { max-height: 300px; overflow-y: auto; border: 1px solid #e0e0e0; border-radius: 8px; }
+        .search-result-item { padding: 12px 15px; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center; }
+        .alert { position: fixed; top: 70px; right: 20px; z-index: 9999; min-width: 300px; }
+        .member-item { padding: 10px; border: 1px solid #e0e0e0; border-radius: 8px; margin-bottom: 5px; display: flex; justify-content: space-between; align-items: center; }
+        .member-selected { background: #e8e8ff; border-color: #667eea; }
+        .btn-group-action { background: #667eea; color: white; border: none; padding: 8px 15px; border-radius: 8px; cursor: pointer; margin: 5px; }
+        .btn-group-action:hover { opacity: 0.9; }
+    </style>
+</head>
+<body data-user-id="{{ user_id }}" data-username="{{ username }}">
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container-fluid">
+            <span class="navbar-brand"><i class="fas fa-comments"></i> Messaging App</span>
+            <div class="ms-auto">
+                <span class="text-white me-3">{{ username }}</span>
+                <a href="{{ url_for('auth.logout') }}" class="btn btn-outline-light btn-sm">Logout</a>
+            </div>
+        </div>
+    </nav>
+    
+    <div class="container-main">
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <ul class="nav nav-tabs" role="tablist">
+                    <li class="nav-item">
+                        <a class="nav-link active" data-bs-toggle="tab" href="#contacts-tab">Contacts</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-bs-toggle="tab" href="#groups-tab">Groups</a>
+                    </li>
+                </ul>
+                
+                <div class="tab-content">
+                    <div class="tab-pane fade show active" id="contacts-tab">
+                        <div class="search-box">
+                            <input type="text" id="searchInput" placeholder="Search contacts...">
+                        </div>
+                        <button class="btn-action btn-add-contact" data-bs-toggle="modal" data-bs-target="#addContactModal">
+                            <i class="fas fa-plus"></i> Add Contact
+                        </button>
+                    </div>
+                    
+                    <div class="tab-pane fade" id="groups-tab">
+                        <div class="search-box">
+                            <input type="text" id="searchGroupInput" placeholder="Search groups...">
+                        </div>
+                        <button class="btn-action btn-create-group" data-bs-toggle="modal" data-bs-target="#createGroupModal">
+                            <i class="fas fa-users"></i> Create Group
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="contacts-list" id="contactsList">
+                <div style="padding: 20px; text-align: center; color: #999;">
+                    <p><i class="fas fa-inbox"></i></p>
+                    <p>Loading contacts...</p>
+                </div>
+            </div>
+            
+            <div class="contacts-list d-none" id="groupsList">
+                <div style="padding: 20px; text-align: center; color: #999;">
+                    <p><i class="fas fa-users"></i></p>
+                    <p>Loading groups...</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="chat-container" id="chatContainer">
+            <div class="empty-state">
+                <i class="fas fa-comments"></i>
+                <h3>Select a contact or group to start chatting</h3>
+                <p>Choose from the list or create a new group</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Add Contact Modal -->
+    <div class="modal fade" id="addContactModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add New Contact</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Search for users</label>
+                        <input type="text" id="searchUsers" class="form-control" placeholder="Enter username or email">
+                    </div>
+                    <div id="searchResults" class="search-results d-none"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Create Group Modal -->
+    <div class="modal fade" id="createGroupModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Create New Group</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Group Name</label>
+                        <input type="text" id="groupName" class="form-control" placeholder="Enter group name">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Select Members</label>
+                        <div id="membersList" class="search-results"></div>
+                    </div>
+                    <button class="btn-group-action w-100" onclick="createGroup()">Create Group</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Group Info Modal -->
+    <div class="modal fade" id="groupInfoModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Group Info</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="groupInfoContent"></div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="alertContainer"></div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const currentUserId = {{ user_id }};
+        const currentUsername = "{{ username }}";
+        let socket;
+        let currentChatUser = null;
+        let currentGroup = null;
+        let allContacts = [];
+        let allGroups = [];
+        let typingTimeout;
+        let selectedMembers = new Set();
+        
+        console.log('[INIT] Dashboard loaded - User:', currentUserId, currentUsername);
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('[INIT] Initializing Socket.IO connection...');
+            socket = io({ query: { user_id: currentUserId } });
+            
+            socket.on('connect', () => {
+                console.log('✓ Socket connected');
+                loadContacts();
+                loadGroups();
+            });
+            
+            socket.on('connect_error', (error) => {
+                console.error('✗ Socket connection error:', error);
+                // Still try to load contacts even if socket fails
+                loadContacts();
+                loadGroups();
+            });
+            
+            socket.on('new_message', (data) => {
+                console.log('[SOCKET] New message received:', data);
+                if (currentChatUser && data.sender_id === currentChatUser.user_id) {
+                    displayMessage(data);
+                    scrollToBottom();
+                    socket.emit('mark_read', {user_id: currentUserId, contact_id: data.sender_id});
+                }
+                updateContactUnread(data.sender_id);
+            });
+            
+            socket.on('new_group_message', (data) => {
+                console.log('[SOCKET] New group message:', data);
+                if (currentGroup && data.group_id === currentGroup.group_id) {
+                    displayGroupMessage(data);
+                    scrollToBottom();
+                }
+                updateGroupUnread(data.group_id);
+            });
+            
+            socket.on('message_sent', (data) => {
+                displayMessage(data);
+                scrollToBottom();
+            });
+            
+            socket.on('message_deleted', (data) => markMessageAsDeleted(data.msg_id));
+            socket.on('message_edited', (data) => updateMessageInUI(data.msg_id, data.content));
+            socket.on('user_typing', (data) => {
+                if (currentChatUser && data.user_id === currentChatUser.user_id) {
+                    showTypingIndicator(data.is_typing);
+                }
+            });
+            
+            socket.on('group_user_typing', (data) => {
+                if (currentGroup && data.group_id === currentGroup.group_id && data.user_id !== currentUserId) {
+                    showGroupTypingIndicator(data.username, data.is_typing);
+                }
+            });
+            
+            socket.on('user_online', (data) => updateUserStatus(data.user_id, 'online'));
+            socket.on('user_offline', (data) => updateUserStatus(data.user_id, 'offline'));
+            socket.on('messages_read', (data) => updateMessageStatus('read'));
+            
+            // Tab switching
+            document.querySelectorAll('.nav-link').forEach(tab => {
+                tab.addEventListener('click', (e) => {
+                    if (e.target.getAttribute('href') === '#contacts-tab') {
+                        document.getElementById('contactsList').classList.remove('d-none');
+                        document.getElementById('groupsList').classList.add('d-none');
+                    } else {
+                        document.getElementById('contactsList').classList.add('d-none');
+                        document.getElementById('groupsList').classList.remove('d-none');
+                    }
+                });
+            });
+            
+            // User search in Add Contact modal
+            let searchTimeout;
+            document.getElementById('searchUsers').addEventListener('input', (e) => {
+                clearTimeout(searchTimeout);
+                const query = e.target.value.trim();
+                
+                if (query.length < 2) {
+                    document.getElementById('searchResults').classList.add('d-none');
+                    return;
+                }
+                
+                searchTimeout = setTimeout(() => {
+                    searchForUsers(query);
+                }, 300);
+            });
+            
+            // Contact search
+            document.getElementById('searchInput').addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase();
+                const filtered = allContacts.filter(c => 
+                    c.username.toLowerCase().includes(query) || 
+                    c.email.toLowerCase().includes(query)
+                );
+                displayContacts(filtered);
+            });
+            
+            // Group search
+            document.getElementById('searchGroupInput').addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase();
+                const filtered = allGroups.filter(g => 
+                    g.name.toLowerCase().includes(query)
+                );
+                displayGroups(filtered);
+            });
+            
+            // Create Group modal events
+            const createGroupModal = document.getElementById('createGroupModal');
+            if (createGroupModal) {
+                createGroupModal.addEventListener('shown.bs.modal', () => {
+                    console.log('[MODAL] Create Group opened');
+                    selectedMembers.clear();
+                    loadMembersForGroupCreation();
+                });
+                
+                createGroupModal.addEventListener('hidden.bs.modal', () => {
+                    console.log('[MODAL] Create Group closed');
+                    document.getElementById('groupName').value = '';
+                    selectedMembers.clear();
+                    document.querySelectorAll('.member-item').forEach(el => {
+                        el.classList.remove('member-selected');
+                        const checkIcon = el.querySelector('i');
+                        if (checkIcon) checkIcon.classList.add('d-none');
+                    });
+                });
+            }
+        });
+        
+        function loadContacts() {
+            console.log('[API] Fetching contacts...');
+            fetch('/api/contacts/list')
+                .then(res => {
+                    console.log('[API] Response status:', res.status);
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    return res.json();
+                })
+                .then(data => {
+                    console.log('[API] Contacts received:', data);
+                    allContacts = data.contacts || [];
+                    displayContacts(allContacts);
+                    loadUnreadCounts();
+                })
+                .catch(error => {
+                    console.error('[API] Error loading contacts:', error);
+                    const contactsList = document.getElementById('contactsList');
+                    contactsList.innerHTML = '<div style="padding: 20px; text-align: center; color: #dc3545;"><i class="fas fa-exclamation-triangle"></i><p>Error loading contacts</p><button class="btn btn-sm btn-primary mt-2" onclick="loadContacts()">Retry</button></div>';
+                });
+        }
+        
+        function loadGroups() {
+            console.log('[API] Fetching groups...');
+            fetch('/api/groups/list')
+                .then(res => res.json())
+                .then(data => {
+                    console.log('[API] Groups received:', data);
+                    allGroups = data.groups || [];
+                    displayGroups(allGroups);
+                })
+                .catch(error => {
+                    console.error('[API] Error loading groups:', error);
+                });
+        }
+        
+        function displayContacts(contacts) {
+            const contactsList = document.getElementById('contactsList');
+            
+            if (!contacts || contacts.length === 0) {
+                contactsList.innerHTML = '<div style="padding: 20px; text-align: center; color: #999;"><p><i class="fas fa-inbox"></i></p><p>No contacts yet</p></div>';
+                return;
+            }
+            
+            contactsList.innerHTML = contacts.map(contact => `
+                <div class="contact-item" onclick="openChat(${contact.user_id}, '${contact.username}', '${contact.status}')" data-user-id="${contact.user_id}">
+                    <div class="contact-info">
+                        <div class="contact-name">
+                            <span class="status-badge ${contact.status === 'online' ? 'status-online' : 'status-offline'}" id="status-${contact.user_id}"></span>
+                            ${contact.username}
+                        </div>
+                        <div class="contact-status">${contact.email}</div>
+                    </div>
+                    <span class="unread-badge d-none" id="unread-${contact.user_id}">0</span>
+                </div>
+            `).join('');
+        }
+        
+        function displayGroups(groups) {
+            const groupsList = document.getElementById('groupsList');
+            
+            if (!groups || groups.length === 0) {
+                groupsList.innerHTML = '<div style="padding: 20px; text-align: center; color: #999;"><p><i class="fas fa-users"></i></p><p>No groups yet</p></div>';
+                return;
+            }
+            
+            groupsList.innerHTML = groups.map(group => `
+                <div class="group-item" onclick="openGroup(${group.group_id}, '${group.name}')" data-group-id="${group.group_id}">
+                    <div class="contact-info">
+                        <div class="contact-name">
+                            <i class="fas fa-users"></i> ${group.name}
+                            <span class="group-badge">${group.member_count}</span>
+                        </div>
+                        <div class="contact-status">
+                            ${group.role === 'admin' ? '<i class="fas fa-crown" style="color: gold;"></i> Admin' : 'Member'}
+                        </div>
+                    </div>
+                    ${group.unread_count > 0 ? `<span class="unread-badge">${group.unread_count}</span>` : ''}
+                </div>
+            `).join('');
+        }
+        
+        function openChat(userId, username, status) {
+            currentChatUser = {user_id: userId, username, status};
+            currentGroup = null;
+            
+            document.querySelectorAll('.contact-item, .group-item').forEach(el => el.classList.remove('active'));
+            document.querySelector(`[data-user-id="${userId}"]`)?.classList.add('active');
+            
+            const unreadBadge = document.getElementById(`unread-${userId}`);
+            if (unreadBadge) unreadBadge.classList.add('d-none');
+            
+            const chatContainer = document.getElementById('chatContainer');
+            chatContainer.innerHTML = `
+                <div class="chat-header">
+                    <div class="chat-user-info">
+                        <h4>${username}</h4>
+                        <div class="chat-user-status" id="chatStatus">
+                            <span class="status-badge ${status === 'online' ? 'status-online' : 'status-offline'}"></span>
+                            ${status}
+                        </div>
+                        <div class="typing-indicator d-none" id="typingIndicator">typing...</div>
+                    </div>
+                </div>
+                <div class="chat-messages" id="chatMessages"></div>
+                <div class="chat-input-container">
+                    <input type="text" class="chat-input" id="messageInput" placeholder="Type a message..." 
+                           onkeypress="handleKeyPress(event)" oninput="handleTyping()">
+                    <button class="btn-send" onclick="sendMessage()"><i class="fas fa-paper-plane"></i> Send</button>
+                </div>
+            `;
+            
+            loadMessages(userId);
+            socket.emit('mark_read', {user_id: currentUserId, contact_id: userId});
+        }
+        
+        function openGroup(groupId, groupName) {
+            currentGroup = {group_id: groupId, name: groupName};
+            currentChatUser = null;
+            
+            document.querySelectorAll('.contact-item, .group-item').forEach(el => el.classList.remove('active'));
+            document.querySelector(`[data-group-id="${groupId}"]`)?.classList.add('active');
+            
+            socket.emit('join_group', {user_id: currentUserId, group_id: groupId});
+            
+            const chatContainer = document.getElementById('chatContainer');
+            chatContainer.innerHTML = `
+                <div class="chat-header">
+                    <div class="chat-user-info">
+                        <h4><i class="fas fa-users"></i> ${groupName}</h4>
+                        <div class="chat-user-status">Group Chat</div>
+                        <div class="typing-indicator d-none" id="typingIndicator"></div>
+                    </div>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="showGroupInfo(${groupId})">
+                        <i class="fas fa-info-circle"></i> Info
+                    </button>
+                </div>
+                <div class="chat-messages" id="chatMessages"></div>
+                <div class="chat-input-container">
+                    <input type="text" class="chat-input" id="messageInput" placeholder="Type a message..." 
+                           onkeypress="handleGroupKeyPress(event)" oninput="handleGroupTyping()">
+                    <button class="btn-send" onclick="sendGroupMessage()"><i class="fas fa-paper-plane"></i> Send</button>
+                </div>
+            `;
+            
+            loadGroupMessages(groupId);
+        }
+        
+        function loadMessages(contactId) {
+            fetch(`/api/messages/history/${contactId}`)
+                .then(res => res.json())
+                .then(data => {
+                    const messagesContainer = document.getElementById('chatMessages');
+                    messagesContainer.innerHTML = '';
+                    data.messages.forEach(msg => displayMessage(msg));
+                    scrollToBottom();
+                });
+        }
+        
+        function loadGroupMessages(groupId) {
+            fetch(`/api/groups/${groupId}/messages`)
+                .then(res => res.json())
+                .then(data => {
+                    const messagesContainer = document.getElementById('chatMessages');
+                    messagesContainer.innerHTML = '';
+                    data.messages.forEach(msg => displayGroupMessage(msg));
+                    scrollToBottom();
+                });
+        }
+        
+        function displayMessage(msg) {
+            const messagesContainer = document.getElementById('chatMessages');
+            let messageDiv = document.querySelector(`[data-msg-id="${msg.msg_id}"]`);
+            
+            // Determine if this message is from current user
+            const isMine = msg.sender_id === currentUserId || msg.is_mine === true;
+            
+            console.log('[DISPLAY] Direct message:', {
+                msg_id: msg.msg_id,
+                sender_id: msg.sender_id,
+                receiver_id: msg.receiver_id,
+                currentUserId: currentUserId,
+                is_mine: msg.is_mine,
+                calculated_isMine: isMine,
+                content: msg.content
+            });
+            
+            if (messageDiv) {
+                const contentDiv = messageDiv.querySelector('.message-content');
+                if (contentDiv) {
+                    if (msg.deleted) {
+                        contentDiv.innerHTML = '<i class="fas fa-ban"></i> This message was deleted';
+                        messageDiv.classList.add('message-deleted');
+                        const actions = messageDiv.querySelector('.message-actions');
+                        if (actions) actions.remove();
+                    } else {
+                        contentDiv.textContent = msg.content;
+                        if (msg.edited) {
+                            const editedLabel = messageDiv.querySelector('.edited-label') || document.createElement('span');
+                            editedLabel.className = 'edited-label';
+                            editedLabel.textContent = '(edited)';
+                            if (!messageDiv.querySelector('.edited-label')) contentDiv.appendChild(editedLabel);
+                        }
+                    }
+                }
+                return;
+            }
+            
+            messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isMine ? 'mine' : 'theirs'}${msg.deleted ? ' message-deleted' : ''}`;
+            messageDiv.setAttribute('data-msg-id', msg.msg_id);
+            
+            const time = new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            let statusIcon = '';
+            if (isMine) {
+                if (msg.status === 'read') statusIcon = '<i class="fas fa-check-double" style="color: #4fc3f7;"></i>';
+                else if (msg.status === 'delivered') statusIcon = '<i class="fas fa-check-double"></i>';
+                else statusIcon = '<i class="fas fa-check"></i>';
+            }
+            
+            const editedLabel = msg.edited && !msg.deleted ? '<span class="edited-label">(edited)</span>' : '';
+            const messageActions = isMine && !msg.deleted ? `
+                <div class="message-actions">
+                    <button onclick="editMessage(${msg.msg_id}, '${msg.content.replace(/'/g, "\\'")}', ${msg.receiver_id || currentChatUser.user_id})" title="Edit">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button onclick="deleteMessage(${msg.msg_id}, ${msg.receiver_id || currentChatUser.user_id})" title="Delete">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            ` : '';
+            
+            const messageContent = msg.deleted ? '<i class="fas fa-ban"></i> This message was deleted' : msg.content + editedLabel;
+            
+            messageDiv.innerHTML = `
+                <div class="message-bubble">
+                    <div class="message-content">${messageContent}</div>
+                    <div class="message-time">${time} ${statusIcon}</div>
+                    ${messageActions}
+                </div>
+            `;
+            
+            messagesContainer.appendChild(messageDiv);
+        }
+
+        function displayGroupMessage(msg) {
+            const messagesContainer = document.getElementById('chatMessages');
+            let messageDiv = document.querySelector(`[data-msg-id="${msg.msg_id}"]`);
+            
+            // Determine if this message is from current user
+            const isMine = msg.sender_id === currentUserId || msg.is_mine === true;
+            
+            console.log('[DISPLAY] Group message:', {
+                msg_id: msg.msg_id,
+                sender_id: msg.sender_id,
+                currentUserId: currentUserId,
+                is_mine: msg.is_mine,
+                calculated_isMine: isMine,
+                content: msg.content
+            });
+            
+            if (messageDiv) {
+                const contentDiv = messageDiv.querySelector('.message-content');
+                if (contentDiv) {
+                    if (msg.deleted) {
+                        contentDiv.innerHTML = '<i class="fas fa-ban"></i> This message was deleted';
+                        messageDiv.classList.add('message-deleted');
+                        const actions = messageDiv.querySelector('.message-actions');
+                        if (actions) actions.remove();
+                    } else {
+                        contentDiv.textContent = msg.content;
+                        if (msg.edited) {
+                            const editedLabel = messageDiv.querySelector('.edited-label') || document.createElement('span');
+                            editedLabel.className = 'edited-label';
+                            editedLabel.textContent = '(edited)';
+                            if (!messageDiv.querySelector('.edited-label')) contentDiv.appendChild(editedLabel);
+                        }
+                    }
+                }
+                return;
+            }
+            
+            messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isMine ? 'mine' : 'theirs'}${msg.deleted ? ' message-deleted' : ''}`;
+            messageDiv.setAttribute('data-msg-id', msg.msg_id);
+            
+            const time = new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            const senderName = isMine ? 'You' : msg.sender_username;
+            const editedLabel = msg.edited && !msg.deleted ? '<span class="edited-label">(edited)</span>' : '';
+            const messageContent = msg.deleted ? '<i class="fas fa-ban"></i> This message was deleted' : msg.content + editedLabel;
+            
+            const messageActions = isMine && !msg.deleted ? `
+                <div class="message-actions">
+                    <button onclick="editGroupMessage(${msg.msg_id}, '${msg.content.replace(/'/g, "\\'")}', ${currentGroup.group_id})" title="Edit">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button onclick="deleteGroupMessage(${msg.msg_id}, ${currentGroup.group_id})" title="Delete">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            ` : '';
+            
+            let statusIcon = '';
+            if (isMine) {
+                if (msg.status === 'read') statusIcon = '<i class="fas fa-check-double" style="color: #4fc3f7;"></i>';
+                else if (msg.status === 'delivered') statusIcon = '<i class="fas fa-check-double"></i>';
+                else statusIcon = '<i class="fas fa-check"></i>';
+            }
+            
+            messageDiv.innerHTML = `
+                <div class="message-bubble">
+                    ${!isMine ? `<div class="sender-name">${senderName}</div>` : ''}
+                    <div class="message-content">${messageContent}</div>
+                    <div class="message-time">${time} ${statusIcon}</div>
+                    ${messageActions}
+                </div>
+            `;
+            
+            messagesContainer.appendChild(messageDiv);
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const content = input.value.trim();
+            
+            if (!content || !currentChatUser) return;
+            
+            socket.emit('send_message', {
+                sender_id: currentUserId,
+                receiver_id: currentChatUser.user_id,
+                content: content
+            });
+            
+            input.value = '';
+        }
+
+        function sendGroupMessage() {
+            const input = document.getElementById('messageInput');
+            const content = input.value.trim();
+            
+            if (!content || !currentGroup) return;
+            
+            socket.emit('send_group_message', {
+                sender_id: currentUserId,
+                group_id: currentGroup.group_id,
+                content: content
+            });
+            
+            input.value = '';
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') sendMessage();
+        }
+
+        function handleGroupKeyPress(event) {
+            if (event.key === 'Enter') sendGroupMessage();
+        }
+
+        function handleTyping() {
+            if (!currentChatUser) return;
+            
+            socket.emit('typing', {
+                sender_id: currentUserId,
+                receiver_id: currentChatUser.user_id,
+                is_typing: true
+            });
+            
+            clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(() => {
+                socket.emit('typing', {
+                    sender_id: currentUserId,
+                    receiver_id: currentChatUser.user_id,
+                    is_typing: false
+                });
+            }, 1000);
+        }
+
+        function handleGroupTyping() {
+            if (!currentGroup) return;
+            
+            socket.emit('group_typing', {
+                sender_id: currentUserId,
+                group_id: currentGroup.group_id,
+                sender_username: currentUsername,
+                is_typing: true
+            });
+            
+            clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(() => {
+                socket.emit('group_typing', {
+                    sender_id: currentUserId,
+                    group_id: currentGroup.group_id,
+                    sender_username: currentUsername,
+                    is_typing: false
+                });
+            }, 1000);
+        }
+
+        function showTypingIndicator(isTyping) {
+            const indicator = document.getElementById('typingIndicator');
+            if (indicator) {
+                if (isTyping) indicator.classList.remove('d-none');
+                else indicator.classList.add('d-none');
+            }
+        }
+
+        function showGroupTypingIndicator(username, isTyping) {
+            const indicator = document.getElementById('typingIndicator');
+            if (indicator) {
+                if (isTyping) {
+                    indicator.textContent = `${username} is typing...`;
+                    indicator.classList.remove('d-none');
+                } else {
+                    indicator.classList.add('d-none');
+                }
+            }
+        }
+
+        function loadMembersForGroupCreation() {
+            console.log('[MODAL] Loading members for group creation...');
+            
+            fetch('/api/contacts/list')
+                .then(res => res.json())
+                .then(data => {
+                    console.log('[MODAL] Contacts received:', data);
+                    const membersList = document.getElementById('membersList');
+                    
+                    if (!data.contacts || data.contacts.length === 0) {
+                        membersList.innerHTML = '<p style="padding: 10px; text-align: center; color: #999;">No contacts available. Add contacts first!</p>';
+                        return;
+                    }
+                    
+                    membersList.innerHTML = data.contacts.map(contact => `
+                        <div class="member-item" onclick="toggleMember(${contact.user_id}, this)" data-user-id="${contact.user_id}">
+                            <div>
+                                <strong>${contact.username}</strong>
+                                <div style="font-size: 12px; color: #999;">${contact.email}</div>
+                            </div>
+                            <i class="fas fa-check d-none"></i>
+                        </div>
+                    `).join('');
+                    
+                    console.log('[MODAL] Members list populated with', data.contacts.length, 'contacts');
+                })
+                .catch(err => {
+                    console.error('[MODAL] Failed to load contacts:', err);
+                    const membersList = document.getElementById('membersList');
+                    membersList.innerHTML = '<p style="padding: 10px; text-align: center; color: #dc3545;">Error loading contacts. Please refresh.</p>';
+                });
+        }
+
+        function toggleMember(userId, element) {
+            if (selectedMembers.has(userId)) {
+                selectedMembers.delete(userId);
+                element.classList.remove('member-selected');
+                element.querySelector('i').classList.add('d-none');
+            } else {
+                selectedMembers.add(userId);
+                element.classList.add('member-selected');
+                element.querySelector('i').classList.remove('d-none');
+            }
+        }
+
+        function createGroup() {
+            const groupName = document.getElementById('groupName').value.trim();
+            
+            if (!groupName) {
+                showAlert('Please enter a group name', 'error');
+                return;
+            }
+            
+            if (selectedMembers.size === 0) {
+                showAlert('Please select at least one member', 'error');
+                return;
+            }
+            
+            fetch('/api/groups/create', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    name: groupName,
+                    members: Array.from(selectedMembers),
+                    privacy: 'private'
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    showAlert('Group created successfully!', 'success');
+                    loadGroups();
+                    document.getElementById('groupName').value = '';
+                    selectedMembers.clear();
+                    document.querySelectorAll('.member-item').forEach(el => {
+                        el.classList.remove('member-selected');
+                        el.querySelector('i').classList.add('d-none');
+                    });
+                    bootstrap.Modal.getInstance(document.getElementById('createGroupModal')).hide();
+                } else {
+                    showAlert(data.error, 'error');
+                }
+            })
+            .catch(err => showAlert('Error creating group', 'error'));
+        }
+
+        function showGroupInfo(groupId) {
+            fetch(`/api/groups/${groupId}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        const group = data.group;
+                        const content = document.getElementById('groupInfoContent');
+                        
+                        content.innerHTML = `
+                            <div class="mb-3">
+                                <strong>Group Name:</strong> ${group.name}
+                            </div>
+                            <div class="mb-3">
+                                <strong>Created by:</strong> ${group.creator_username}
+                            </div>
+                            <div class="mb-3">
+                                <strong>Members (${group.members.length}):</strong>
+                                <div class="mt-2">
+                                    ${group.members.map(m => `
+                                        <div class="member-item">
+                                            <div>
+                                                <strong>${m.username}</strong>
+                                                ${m.role === 'admin' ? '<i class="fas fa-crown" style="color: gold; margin-left: 5px;"></i>' : ''}
+                                                <div style="font-size: 12px; color: #999;">${m.email}</div>
+                                            </div>
+                                            ${group.user_role === 'admin' && m.user_id !== group.created_by ? `
+                                                <button class="btn btn-sm btn-danger" onclick="removeMember(${groupId}, ${m.user_id})">
+                                                    <i class="fas fa-times"></i>
+                                                </button>
+                                            ` : ''}
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                            ${group.user_role === 'admin' ? `
+                                <button class="btn btn-danger w-100" onclick="deleteGroup(${groupId})">
+                                    <i class="fas fa-trash"></i> Delete Group
+                                </button>
+                            ` : `
+                                <button class="btn btn-warning w-100" onclick="leaveGroup(${groupId})">
+                                    <i class="fas fa-sign-out-alt"></i> Leave Group
+                                </button>
+                            `}
+                        `;
+                        
+                        new bootstrap.Modal(document.getElementById('groupInfoModal')).show();
+                    }
+                });
+        }
+
+        function removeMember(groupId, memberId) {
+            if (!confirm('Remove this member?')) return;
+            
+            fetch(`/api/groups/${groupId}/remove-member/${memberId}`, {
+                method: 'DELETE'
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    showAlert('Member removed', 'success');
+                    showGroupInfo(groupId);
+                } else {
+                    showAlert(data.error, 'error');
+                }
+            });
+        }
+
+        function leaveGroup(groupId) {
+            if (!confirm('Leave this group?')) return;
+            
+            fetch(`/api/groups/${groupId}/leave`, {
+                method: 'POST'
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    showAlert('Left group', 'success');
+                    bootstrap.Modal.getInstance(document.getElementById('groupInfoModal')).hide();
+                    loadGroups();
+                    document.getElementById('chatContainer').innerHTML = `
+                        <div class="empty-state">
+                            <i class="fas fa-comments"></i>
+                            <h3>Select a contact or group to start chatting</h3>
+                        </div>
+                    `;
+                } else {
+                    showAlert(data.error, 'error');
+                }
+            });
+        }
+
+        function deleteGroup(groupId) {
+            if (!confirm('Delete this group? This cannot be undone!')) return;
+            
+            fetch(`/api/groups/${groupId}/delete`, {
+                method: 'DELETE'
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    showAlert('Group deleted', 'success');
+                    bootstrap.Modal.getInstance(document.getElementById('groupInfoModal')).hide();
+                    loadGroups();
+                    document.getElementById('chatContainer').innerHTML = `
+                        <div class="empty-state">
+                            <i class="fas fa-comments"></i>
+                            <h3>Select a contact or group to start chatting</h3>
+                        </div>
+                    `;
+                } else {
+                    showAlert(data.error, 'error');
+                }
+            });
+        }
+
+        function deleteMessage(msgId, receiverId) {
+            if (!confirm('Delete this message?')) return;
+            
+            fetch(`/api/messages/delete/${msgId}`, {
+                method: 'DELETE'
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    socket.emit('delete_message', {
+                        sender_id: currentUserId,
+                        msg_id: msgId,
+                        receiver_id: receiverId
+                    });
+                    showAlert('Message deleted', 'success');
+                } else {
+                    showAlert(data.error, 'error');
+                }
+            });
+        }
+
+        function deleteGroupMessage(msgId, groupId) {
+            if (!confirm('Delete this message?')) return;
+            
+            fetch(`/api/messages/delete/${msgId}`, {
+                method: 'DELETE'
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    socket.emit('delete_message', {
+                        sender_id: currentUserId,
+                        msg_id: msgId,
+                        group_id: groupId
+                    });
+                    showAlert('Message deleted', 'success');
+                } else {
+                    showAlert(data.error, 'error');
+                }
+            });
+        }
+
+        function editMessage(msgId, currentContent, receiverId) {
+            const newContent = prompt('Edit message:', currentContent);
+            
+            if (!newContent || newContent.trim() === '' || newContent === currentContent) return;
+            
+            fetch(`/api/messages/edit/${msgId}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({content: newContent})
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    socket.emit('edit_message', {
+                        sender_id: currentUserId,
+                        msg_id: msgId,
+                        content: newContent,
+                        receiver_id: receiverId
+                    });
+                    showAlert('Message updated', 'success');
+                } else {
+                    showAlert(data.error, 'error');
+                }
+            });
+        }
+
+        function editGroupMessage(msgId, currentContent, groupId) {
+            const newContent = prompt('Edit message:', currentContent);
+            
+            if (!newContent || newContent.trim() === '' || newContent === currentContent) return;
+            
+            fetch(`/api/messages/edit/${msgId}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({content: newContent})
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    socket.emit('edit_message', {
+                        sender_id: currentUserId,
+                        msg_id: msgId,
+                        content: newContent,
+                        group_id: groupId
+                    });
+                    showAlert('Message updated', 'success');
+                } else {
+                    showAlert(data.error, 'error');
+                }
+            });
+        }
+
+        function markMessageAsDeleted(msgId) {
+            const messageDiv = document.querySelector(`[data-msg-id="${msgId}"]`);
+            if (messageDiv) {
+                const contentDiv = messageDiv.querySelector('.message-content');
+                if (contentDiv) {
+                    contentDiv.innerHTML = '<i class="fas fa-ban"></i> This message was deleted';
+                    messageDiv.classList.add('message-deleted');
+                    const actions = messageDiv.querySelector('.message-actions');
+                    if (actions) actions.remove();
+                }
+            }
+        }
+
+        function updateMessageInUI(msgId, newContent) {
+            const messageDiv = document.querySelector(`[data-msg-id="${msgId}"]`);
+            if (messageDiv) {
+                const contentDiv = messageDiv.querySelector('.message-content');
+                if (contentDiv) {
+                    contentDiv.textContent = newContent;
+                    if (!contentDiv.querySelector('.edited-label')) {
+                        const editedLabel = document.createElement('span');
+                        editedLabel.className = 'edited-label';
+                        editedLabel.textContent = '(edited)';
+                        contentDiv.appendChild(editedLabel);
+                    }
+                }
+            }
+        }
+
+        function scrollToBottom() {
+            const messagesContainer = document.getElementById('chatMessages');
+            if (messagesContainer) {
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+        }
+
+        function updateUserStatus(userId, status) {
+            const statusBadge = document.getElementById(`status-${userId}`);
+            if (statusBadge) {
+                statusBadge.className = `status-badge ${status === 'online' ? 'status-online' : 'status-offline'}`;
+            }
+            
+            if (currentChatUser && currentChatUser.user_id === userId) {
+                const chatStatus = document.getElementById('chatStatus');
+                if (chatStatus) {
+                    chatStatus.innerHTML = `
+                        <span class="status-badge ${status === 'online' ? 'status-online' : 'status-offline'}"></span>
+                        ${status}
+                    `;
+                }
+            }
+        }
+
+        function loadUnreadCounts() {
+            fetch('/api/messages/unread-per-contact')
+                .then(res => res.json())
+                .then(data => {
+                    Object.keys(data.unread).forEach(userId => {
+                        updateContactUnread(userId, data.unread[userId]);
+                    });
+                });
+        }
+
+        function updateContactUnread(userId, count = null) {
+            const unreadBadge = document.getElementById(`unread-${userId}`);
+            if (unreadBadge) {
+                if (count === null) {
+                    fetch('/api/messages/unread-per-contact')
+                        .then(res => res.json())
+                        .then(data => {
+                            const unreadCount = data.unread[userId] || 0;
+                            if (unreadCount > 0) {
+                                unreadBadge.textContent = unreadCount;
+                                unreadBadge.classList.remove('d-none');
+                            } else {
+                                unreadBadge.classList.add('d-none');
+                            }
+                        });
+                } else {
+                    if (count > 0) {
+                        unreadBadge.textContent = count;
+                        unreadBadge.classList.remove('d-none');
+                    } else {
+                        unreadBadge.classList.add('d-none');
+                    }
+                }
+            }
+        }
+
+        function updateGroupUnread(groupId) {
+            loadGroups();
+        }
+
+        function updateMessageStatus(status) {
+            document.querySelectorAll('.message.mine .fas').forEach(icon => {
+                if (status === 'read') {
+                    icon.className = 'fas fa-check-double';
+                    icon.style.color = '#4fc3f7';
+                }
+            });
+        }
+
+        function showAlert(message, type) {
+            const alertContainer = document.getElementById('alertContainer');
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type === 'error' ? 'danger' : 'success'} alert-dismissible fade show`;
+            alertDiv.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            alertContainer.appendChild(alertDiv);
+            setTimeout(() => alertDiv.remove(), 3000);
+        }
+
+        function searchForUsers(query) {
+            console.log('[SEARCH] Searching for users:', query);
+            const resultsDiv = document.getElementById('searchResults');
+            
+            resultsDiv.innerHTML = '<div style="padding: 10px; text-align: center;"><i class="fas fa-spinner fa-spin"></i> Searching...</div>';
+            resultsDiv.classList.remove('d-none');
+            
+            fetch(`/api/contacts/search?q=${encodeURIComponent(query)}`)
+                .then(res => res.json())
+                .then(data => {
+                    console.log('[SEARCH] Results:', data);
+                    
+                    if (!data.results || data.results.length === 0) {
+                        resultsDiv.innerHTML = '<div style="padding: 10px; text-align: center; color: #999;">No users found</div>';
+                        return;
+                    }
+                    
+                    resultsDiv.innerHTML = data.results.map(user => `
+                        <div class="search-result-item">
+                            <div>
+                                <h6 style="margin: 0;">${user.username}</h6>
+                                <p style="margin: 0; font-size: 12px; color: #999;">${user.email}</p>
+                            </div>
+                            <button class="btn btn-primary btn-sm" onclick="addContact(${user.user_id})" 
+                                    ${user.is_contact ? 'disabled' : ''}>
+                                ${user.is_contact ? 'Added' : 'Add'}
+                            </button>
+                        </div>
+                    `).join('');
+                })
+                .catch(error => {
+                    console.error('[SEARCH] Error:', error);
+                    resultsDiv.innerHTML = '<div style="padding: 10px; text-align: center; color: #dc3545;">Search failed</div>';
+                });
+        }
+
+        function addContact(userId) {
+            fetch('/api/contacts/add', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({contact_user_id: userId})
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    showAlert('Contact added!', 'success');
+                    loadContacts();
+                    document.getElementById('searchUsers').value = '';
+                    document.getElementById('searchResults').classList.add('d-none');
+                    bootstrap.Modal.getInstance(document.getElementById('addContactModal')).hide();
+                } else {
+                    showAlert(data.error, 'error');
+                }
+            });
+        }
+    </script>
+</body>
+</html>
