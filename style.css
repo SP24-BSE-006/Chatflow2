@@ -24,3 +24,181 @@ messaging_app/
 └── static/
     └── css/
         └── style.css (CREATE THIS)
+
+/* File attachment styles */
+.attachment-preview { 
+    max-width: 300px; 
+    margin: 10px 0; 
+    border-radius: 12px; 
+    overflow: hidden; 
+    position: relative; 
+}
+
+.attachment-preview img { 
+    width: 100%; 
+    height: auto; 
+    display: block; 
+    border-radius: 8px; 
+    cursor: pointer; 
+    transition: transform 0.2s; 
+}
+
+.attachment-preview img:hover { 
+    transform: scale(1.02); 
+}
+
+/* Document attachment styling */
+.attachment-document { 
+    display: flex; 
+    align-items: center; 
+    padding: 12px 15px; 
+    background: rgba(255, 255, 255, 0.1); 
+    border-radius: 8px; 
+    gap: 12px; 
+    cursor: pointer; 
+    transition: all 0.2s; 
+    text-decoration: none;
+    position: relative;
+}
+
+.attachment-document:hover { 
+    background: rgba(255, 255, 255, 0.2); 
+    transform: translateY(-2px);
+}
+
+/* Sender side (mine) - white text and icons */
+.message.mine .attachment-document { 
+    background: rgba(255, 255, 255, 0.15); 
+}
+
+.message.mine .attachment-document:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.message.mine .attachment-document .attachment-icon {
+    color: white;
+}
+
+.message.mine .attachment-document .attachment-name {
+    color: white;
+}
+
+.message.mine .attachment-document .attachment-size {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.message.mine .attachment-document .attachment-download {
+    color: white;
+}
+
+/* Receiver side (theirs) - purple theme */
+.message.theirs .attachment-document { 
+    background: rgba(102, 126, 234, 0.1);
+}
+
+.message.theirs .attachment-document:hover {
+    background: rgba(102, 126, 234, 0.15);
+}
+
+.message.theirs .attachment-document .attachment-icon {
+    color: #667eea;
+}
+
+.message.theirs .attachment-document .attachment-name {
+    color: #667eea;
+}
+
+.message.theirs .attachment-document .attachment-size {
+    color: rgba(102, 126, 234, 0.7);
+}
+
+.message.theirs .attachment-document .attachment-download {
+    color: #667eea;
+}
+
+/* Common attachment styles */
+.attachment-icon { 
+    font-size: 32px; 
+    min-width: 40px; 
+    text-align: center; 
+}
+
+.attachment-info { 
+    flex: 1; 
+}
+
+.attachment-name { 
+    font-weight: 600; 
+    margin-bottom: 2px; 
+    word-break: break-word; 
+}
+
+.attachment-size { 
+    font-size: 12px; 
+}
+
+.attachment-download { 
+    font-size: 20px; 
+}
+
+/* Hide download icon by default, show only on receiver side on hover */
+.message.mine .attachment-download {
+    display: none;
+}
+
+.message.theirs .attachment-download {
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.message.theirs .attachment-document:hover .attachment-download {
+    opacity: 1;
+}
+
+/* Downloaded state - hide download icon completely */
+.attachment-document.downloaded .attachment-download {
+    display: none;
+}
+
+/* File preview in chat input */
+.file-attachment-preview { 
+    display: none; 
+    padding: 10px 15px; 
+    background: #f0f0f0; 
+    border-radius: 8px; 
+    align-items: center; 
+    gap: 10px; 
+}
+
+.file-attachment-preview.active { 
+    display: flex; 
+}
+
+.file-preview-icon { 
+    font-size: 24px; 
+    color: #667eea; 
+}
+
+.file-preview-info { 
+    flex: 1; 
+}
+
+.file-preview-name { 
+    font-weight: 600; 
+    font-size: 14px; 
+    color: #333; 
+}
+
+.file-preview-size { 
+    font-size: 12px; 
+    color: #666; 
+}
+
+.btn-remove-file { 
+    background: none; 
+    border: none; 
+    color: #dc3545; 
+    cursor: pointer; 
+    font-size: 18px; 
+    padding: 5px 10px; 
+}
